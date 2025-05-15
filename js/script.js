@@ -2,9 +2,9 @@
 (() => {
   'use strict';
 
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   // Element-referenser
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   const app     = document.getElementById('app');
   const timerEl = document.getElementById('timer');
   const progEl  = document.getElementById('progress');
@@ -14,30 +14,30 @@
     kamp: document.getElementById('nav-kamp'),
     help: document.getElementById('nav-help')
   };
-  const sounds = {
+  const sounds  = {
     correct: document.getElementById('audio-correct'),
     wrong:   document.getElementById('audio-wrong'),
     finish:  document.getElementById('audio-finish')
   };
 
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   // Globalt state + localStorage-nycklar
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   let puzzles, staticPages, validNames;
-  let current    = 0;
-  let startTime  = 0;
-  let timerId    = null;
+  let current     = 0;
+  let startTime   = 0;
+  let timerId     = null;
   let puzzleAudio = null;
-  let failCount  = 0;
-  let started    = false;
+  let failCount   = 0;
+  let started     = false;
 
   const LS_STARTED    = 'varkamp_started';
   const LS_START_TIME = 'varkamp_startTime';
   const LS_CURRENT    = 'varkamp_current';
 
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   // Hjälpfunktioner
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   function isPrime(n) {
     if (n < 2) return false;
     for (let i = 2; i * i <= n; i++) {
@@ -45,83 +45,90 @@
     }
     return true;
   }
+
   function vibrate(pattern) {
     navigator.vibrate?.(pattern);
   }
+
   function play(type) {
     const a = sounds[type];
-    if (a) { a.currentTime = 0; a.play().catch(()=>{}); }
+    if (a) {
+      a.currentTime = 0;
+      a.play().catch(()=>{});
+    }
     if (type === 'correct') vibrate(200);
     if (type === 'wrong')   vibrate([100,50,100]);
   }
+
   function showError(el, msg) {
     el.textContent = msg;
   }
+
   function clearAnim(card) {
-    card.classList.remove('correct', 'shake');
+    card.classList.remove('correct','shake');
   }
+
   function updateTimer() {
     const diff = Date.now() - startTime;
-    const mm = String(Math.floor(diff/60000)).padStart(2,'0');
-    const ss = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
+    const mm = String(Math.floor(diff / 60000)).padStart(2,'0');
+    const ss = String(Math.floor((diff % 60000) / 1000)).padStart(2,'0');
     timerEl.textContent = `${mm}:${ss}`;
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Init
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
+  // Init: ladda puzzles.json, preload, bind nav, återuppta eller intro
+  // -----------------------------
   async function init() {
-    // Ladda gåtor + statiska sidor + namnlista
+    // Ladda data
     const res  = await fetch('assets/data/puzzles.json');
     const data = await res.json();
     puzzles     = data.puzzles;
     staticPages = data.staticPages;
     validNames  = data.validNames;
 
-    // Preload ljud och stegobild
-    Object.values(sounds).forEach(a => a.load());
-    const steg = puzzles.find(p=>p.type==='stego');
-    if (steg?.img) new Image().src = steg.img;
+    // Preload ljud + stegobild
+    Object.values(sounds).forEach(a=>a.load());
+    const steg = puzzles.find(p => p.type === 'stego');
+    if (steg && steg.img) new Image().src = steg.img;
 
-    // Bind navigation
-    Object.keys(navBtns).forEach(key => {
-      navBtns[key].addEventListener('click', () => activateTab(key));
+    // Bind navigeringsknappar
+    Object.entries(navBtns).forEach(([key, btn]) => {
+      btn.addEventListener('click', ()=>activateTab(key));
     });
 
-    // Återuppta om redan startat
+    // Återuppta om redan påbörjat
     if (localStorage.getItem(LS_STARTED) === '1') {
-      started    = true;
-      startTime  = parseInt(localStorage.getItem(LS_START_TIME),10) || Date.now();
-      current    = parseInt(localStorage.getItem(LS_CURRENT),10)   || 0;
+      started   = true;
+      startTime = parseInt(localStorage.getItem(LS_START_TIME),10) || Date.now();
+      current   = parseInt(localStorage.getItem(LS_CURRENT),10)   || 0;
       setNavEnabled(true);
       updateTimer();
-      timerId = setInterval(updateTimer, 500);
+      timerId = setInterval(updateTimer,500);
       activateTab('play');
       renderPuzzle(current);
     } else {
-      // Inaktivera statiska flikar tills "Starta tävlingen" klickas
       setNavEnabled(false);
       activateTab('play');
     }
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Aktivera/inaktivera statiska flikar
-  // ────────────────────────────────────────────────────────────────────────────
-  function setNavEnabled(enabled) {
-    ['var','kamp','help'].forEach(k => {
-      navBtns[k].disabled = !enabled;
-      navBtns[k].classList.toggle('disabled', !enabled);
+  // -----------------------------
+  // Aktivera/inaktivera flikar
+  // -----------------------------
+  function setNavEnabled(enable) {
+    ['var','kamp','help'].forEach(key => {
+      navBtns[key].disabled = !enable;
+      navBtns[key].classList.toggle('disabled', !enable);
     });
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   // Växla flik
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   function activateTab(tab) {
-    Object.values(navBtns).forEach(b=>b.classList.remove('active'));
+    Object.values(navBtns).forEach(b => b.classList.remove('active'));
     navBtns[tab].classList.add('active');
-    // Timern fortgår alltid tills slutvy
+    // Timern fortsätter alltid
 
     if (tab === 'play') {
       if (!started) showIntro();
@@ -131,9 +138,9 @@
     }
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Startsida (intro)
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
+  // Visa startsida / intro
+  // -----------------------------
   function showIntro() {
     progEl.textContent = '';
     app.innerHTML = `
@@ -142,80 +149,66 @@
         <p class="prompt">Välkommen till tävlingens första gren!</p>
         <button id="startBtn" class="start-btn">Starta tävlingen</button>
       </div>`;
-    document.getElementById('startBtn').addEventListener('click', () => {
-      // Markera ”startad”
+    document.getElementById('startBtn').addEventListener('click', ()=>{
       started = true;
-      localStorage.setItem(LS_STARTED, '1');
-      // Starttid
+      localStorage.setItem(LS_STARTED,'1');
       startTime = Date.now();
-      localStorage.setItem(LS_START_TIME, String(startTime));
-      // Börja på gåta 0
+      localStorage.setItem(LS_START_TIME,String(startTime));
       current = 0;
-      localStorage.setItem(LS_CURRENT, '0');
-      // Lås upp flikarna
+      localStorage.setItem(LS_CURRENT,'0');
+
       setNavEnabled(true);
-      // Sätt igång timer
       updateTimer();
-      timerId = setInterval(updateTimer, 500);
-      // Rendera första gåtan
+      timerId = setInterval(updateTimer,500);
       renderPuzzle(0);
     });
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Statiska flik-sidor (Vår/Kamp/Hjälp)
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
+  // Visa statisk sida (Vår/Kamp/Hjälp)
+  // -----------------------------
   function showStatic(key) {
+    progEl.textContent = staticPages[key].title;
     const d = staticPages[key];
-    progEl.textContent = d.title;
     app.innerHTML = `
       <div class="card">
         <img src="${d.icon}" class="static-icon" alt="${d.title}">
         <h2>${d.title}</h2>
         <p class="static-text">${d.text.replace(/\n/g,'<br>')}</p>
-        ${d.thumb 
-          ? `<img id="static-thumb" class="static-thumb" src="${d.thumb}" alt="">` 
-          : ''}
+        ${d.thumb ? `<img src="${d.thumb}" id="static-thumb" class="static-thumb">` : ''}
       </div>`;
-
-    // Modal-logik för ”Vår”
-    if (key==='var' && d.thumb) {
+    if (key === 'var' && d.thumb) {
       const thumb = document.getElementById('static-thumb');
       const modal = document.getElementById('img-modal');
       const img   = document.getElementById('modal-img');
       const close = document.getElementById('modal-close');
-      thumb.onclick = () => {
+      thumb.addEventListener('click', ()=>{
         img.src = d.full;
         modal.classList.remove('hidden');
-      };
-      close.onclick = () => {
-        img.src = '';
-        modal.classList.add('hidden');
-      };
-      modal.onclick = e => {
-        if (e.target === modal) {
+      });
+      [close, modal].forEach(el => el.addEventListener('click', e => {
+        if (e.target === el || e.target === modal) {
           img.src = '';
           modal.classList.add('hidden');
         }
-      };
+      }));
     }
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   // Rendera en gåta
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   function renderPuzzle(i) {
     const p = puzzles[i];
-    // Om inga fler gåtor: visa final-vy
     if (!p) return renderFinal();
 
     current = i;
     localStorage.setItem(LS_CURRENT, String(i));
     failCount = 0;
     progEl.textContent = `Gåta ${i+1} av ${puzzles.length}`;
-    app.innerHTML = '';
     if (puzzleAudio) { puzzleAudio.pause(); puzzleAudio = null; }
 
+    app.innerHTML = '';
     const card = document.createElement('div');
     card.className = 'card';
     const prm = document.createElement('div');
@@ -225,8 +218,7 @@
 
     let inputEl, msgEl, hintEl;
 
-    // Skapa UI beroende på p.type
-    switch (p.type) {
+    switch(p.type) {
       case 'name':
       case 'text':
         inputEl = document.createElement('input');
@@ -255,7 +247,6 @@
         break;
 
       case 'stego':
-        puzzleAudio = null;
         const si = document.createElement('img');
         si.src = p.img;
         si.alt = '';
@@ -304,23 +295,19 @@
         break;
 
       case 'magic':
-        // Bygg upp 4×4-grid med fasta och inputs
         const grid = document.createElement('div');
         grid.className = 'magic-grid';
         for (let r = 0; r < p.size; r++) {
           for (let c = 0; c < p.size; c++) {
+            const v = p.grid[r][c];
             const cell = document.createElement('div');
-            cell.className = p.grid[r][c] === '' 
-              ? 'magic-cell' 
-              : 'magic-fixed';
-            if (p.grid[r][c] === '') {
+            cell.className = v === '' ? 'magic-cell' : 'magic-fixed';
+            if (v === '') {
               const inp = document.createElement('input');
               inp.type = 'number';
-              inp.min  = '1';
-              inp.max  = String(p.size*p.size);
               cell.append(inp);
             } else {
-              cell.textContent = p.grid[r][c];
+              cell.textContent = v;
             }
             grid.append(cell);
           }
@@ -333,13 +320,11 @@
         return renderFinal();
     }
 
-    // Fel- och tipstext
-    msgEl  = document.createElement('div'); msgEl.className = 'error-msg';
+    msgEl  = document.createElement('div'); msgEl.className  = 'error-msg';
     hintEl = document.createElement('div'); hintEl.className = 'hint-msg';
     if (p.hint) hintEl.textContent = `Tips: ${p.hint}`;
     card.append(msgEl, hintEl);
 
-    // Skicka-knapp
     const btn = document.createElement('button');
     btn.textContent = 'Skicka';
     btn.addEventListener('click', ()=> checkAnswer(p, inputEl, msgEl, hintEl, card));
@@ -349,13 +334,13 @@
     inputEl?.focus();
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   // Kontrollera svar
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
   function checkAnswer(p, inputEl, msgEl, hintEl, card) {
     clearAnim(card);
 
-    // Dynamiskt svar för prime
+    // Dynamiskt prime-svar
     if (p.type === 'prime') {
       const mins = Math.floor((Date.now() - startTime) / 60000);
       if (!isPrime(mins)) {
@@ -365,10 +350,10 @@
       p.answer = String(mins);
     }
 
-    const ans = (inputEl?.value?.trim().toLowerCase()) || '';
-    let ok  = false;
+    const ans = inputEl?.value?.trim().toLowerCase() || '';
+    let ok = false;
 
-    switch (p.type) {
+    switch(p.type) {
       case 'name':
         ok = validNames.includes(ans);
         break;
@@ -398,68 +383,64 @@
       }
 
       case 'magic': {
-        // Samla ihop alla ifyllda värden
+        // Läs in alla inputs
         const inputs = Array.from(inputEl.querySelectorAll('input'));
-        const vals   = inputs.map(i => parseInt(i.value, 10));
+        const vals   = inputs.map(i => parseInt(i.value,10));
         if (vals.some(isNaN)) {
-          showError(msgEl, 'Fyll alla rutor!');
+          showError(msgEl,'Fyll alla rutor!');
           return;
         }
-        // Bygg full matris M
-        const sz  = p.size,
-              tgt = p.target,
-              M   = [];
+        // Bygg upp matris M
+        const sz  = p.size, tgt = p.target;
+        const M = [];
         let idx = 0;
         for (let r = 0; r < sz; r++) {
           M[r] = [];
           for (let c = 0; c < sz; c++) {
-            M[r][c] = (p.grid[r][c] === '')
-              ? vals[idx++]
-              : Number(p.grid[r][c]);
+            M[r][c] = (p.grid[r][c] === '') ? vals[idx++] : Number(p.grid[r][c]);
           }
         }
-        // Kontrollera rader
+        // Rader
         const rowsOk = M.every(row => row.reduce((a,b)=>a+b,0) === tgt);
-        // Kolumner
-        const colsOk = Array.from({length:sz}).every(c =>
-          M.reduce((sum,row)=>sum+row[c],0) === tgt
+        // Korrigerad kolumnkontroll
+        const colsOk = Array.from({length: sz}).every((_, col) =>
+          M.reduce((sum, row) => sum + row[col], 0) === tgt
         );
         // Diagonaler
-        const diag1 = M.reduce((sum,row,r)=>sum+row[r],0) === tgt;
-        const diag2 = M.reduce((sum,row,r)=>sum+row[sz-1-r],0) === tgt;
+        const diag1 = M.reduce((sum,row,r) => sum + row[r], 0) === tgt;
+        const diag2 = M.reduce((sum,row,r) => sum + row[sz-1-r], 0) === tgt;
+
         ok = rowsOk && colsOk && diag1 && diag2;
         break;
       }
-    } // ← Här slutar switch
+    }
 
-    // Rätt eller fel
     if (ok) {
-      play(current+1 < puzzles.length ? 'correct' : 'finish');
+      play(current + 1 < puzzles.length ? 'correct' : 'finish');
       card.classList.add('correct');
-      setTimeout(() => renderPuzzle(current+1), 500);
+      setTimeout(()=> renderPuzzle(current + 1), 500);
     } else {
       play('wrong');
       card.classList.add('shake');
-      showError(msgEl, '❌ Fel – försök igen!');
+      showError(msgEl,'❌ Fel – försök igen!');
       failCount++;
-      if (failCount >= 2 && p.hint) {
-        hintEl.textContent = `Tips: ${p.hint}`;
-      }
+      if (failCount >= 2 && p.hint) hintEl.textContent = `Tips: ${p.hint}`;
     }
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Slutvy: dokumentation + sammanfattning
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
+  // Final-vy + sammanfattning
+  // -----------------------------
   function renderFinal() {
     clearInterval(timerId);
+    play('finish');
     app.innerHTML = `
       <div class="card" id="final-form">
         <fieldset>
           <legend>Dokumentera trädet</legend>
           <label>1. Ta en gruppbild med trädet</label>
           <input type="file" id="photo" accept="image/*">
-          <img id="preview" style="display:none;width:100%;margin-top:0.5rem;border-radius:8px;">
+          <img id="preview" style="display:none;">
           <label>2. Trädets latinska namn</label>
           <input type="text" id="latin" placeholder="Ex: Quercus robur">
           <label>3. Ditt lagnamn</label>
@@ -472,11 +453,11 @@
         <div class="field"><strong>Latinskt namn:</strong> <span id="out-latin"></span></div>
         <div class="field"><strong>Lagnamn:</strong> <span id="out-team"></span></div>
         <div class="field"><strong>Tid:</strong> <span id="out-time"></span></div>
-        <div class="field"><strong>Bild:</strong><br><img id="out-image" style="width:100%;border-radius:8px;"></div>
-        <p style="margin-top:1rem;">📸 Ta en skärmdump och skicka till domaren.</p>
+        <div class="field"><strong>Bild:</strong><br><img id="out-image"></div>
+        <p>📸 Ta en skärmdump och skicka till domaren.</p>
       </div>`;
 
-    // Bind final-form
+    // Bind final-form logik
     const photo   = document.getElementById('photo');
     const latinI  = document.getElementById('latin');
     const teamI   = document.getElementById('team');
@@ -491,16 +472,16 @@
       submit.disabled = !(
         photo.files.length === 1 &&
         latinI.value.trim() !== '' &&
-        teamI.value.trim() !== ''
+        teamI.value.trim()  !== ''
       );
     }
     [photo, latinI, teamI].forEach(el => el.addEventListener('input', validate));
 
-    photo.addEventListener('change', () => {
+    photo.addEventListener('change', ()=>{
       validate();
       const f = photo.files[0];
-      if (f && f.size > 5 * 1024 * 1024) {
-        alert('Max 5 MB.');
+      if (f && f.size > 5*1024*1024) {
+        alert('Max 5 MB');
         photo.value = '';
         preview.style.display = 'none';
         validate();
@@ -514,28 +495,25 @@
       fr.readAsDataURL(f);
     });
 
-    submit.addEventListener('click', () => {
+    submit.addEventListener('click', ()=>{
       const diff = Date.now() - startTime;
-      const mm = String(Math.floor(diff/60000)).padStart(2,'0');
-      const ss = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
+      const mm   = String(Math.floor(diff/60000)).padStart(2,'0');
+      const ss   = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
       outTime.textContent = `${mm}:${ss}`;
       outLat.textContent  = latinI.value.trim();
       outTeam.textContent = teamI.value.trim();
-
-      const fr2 = new FileReader();
-      fr2.onload = e2 => {
-        outImg.src = e2.target.result;
+      const fr = new FileReader();
+      fr.onload = e => {
+        outImg.src = e.target.result;
         document.getElementById('final-form').style.display = 'none';
         document.getElementById('summary').classList.add('visible');
-        play('finish');
       };
-      fr2.readAsDataURL(photo.files[0]);
+      fr.readAsDataURL(photo.files[0]);
     });
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Kör init när DOM är färdig
-  // ────────────────────────────────────────────────────────────────────────────
+  // -----------------------------
+  // Starta init
+  // -----------------------------
   document.addEventListener('DOMContentLoaded', init);
-
 })();
