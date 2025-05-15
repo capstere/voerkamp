@@ -284,29 +284,52 @@
         card.append(inputEl);
         break;
 
-      case 'magic':
-        const grid = document.createElement('div');
-        grid.className = 'magic-grid';
-        for(let r=0;r<p.size;r++){
-          for(let c=0;c<p.size;c++){
-            const v = p.grid[r][c];
-            const cell=document.createElement('div');
-            if(v===""){
-              cell.className='magic-cell';
-              const inp=document.createElement('input');
-              inp.type='number';
-              cell.append(inp);
-            } else {
-              cell.className='magic-fixed';
-              cell.textContent=v;
-            }
-            grid.append(cell);
-          }
-        }
-        card.append(grid);
-        inputEl = grid;
-        break;
+      case 'magic': {
+  // 1. Hämta alla inmatade värden (i läsriktning rad för rad):
+  const inputs = Array.from(inputEl.querySelectorAll('input'));
+  const vals   = inputs.map(i => parseInt(i.value, 10));
+  // Om någon ruta är tom eller inte ett tal:
+  if (vals.some(isNaN)) {
+    showError(msgEl, 'Fyll alla rutor!');
+    return;
+  }
+
+  // 2. Bygg upp den fullständiga matrisen M, där vi slår ihop fasta värden och inmatade:
+  const sz  = p.size;
+  const tgt = p.target;
+  const M   = [];
+  let idx   = 0;
+
+  for (let r = 0; r < sz; r++) {
+    M[r] = [];
+    for (let c = 0; c < sz; c++) {
+      if (p.grid[r][c] === "") {
+        // tom ruta → ta nästa inmatat värde
+        M[r][c] = vals[idx++];
+      } else {
+        // redan förifyllt → använd p.grid-värdet
+        M[r][c] = Number(p.grid[r][c]);
+      }
     }
+  }
+
+  // 3. Kontrollera summorna:
+  //   a) alla rader
+  const rowsOk = M.every(row => row.reduce((a, b) => a + b, 0) === tgt);
+
+  //   b) alla kolumner
+  const colsOk = Array.from({length: sz}).every(c =>
+    M.reduce((sum, row) => sum + row[c], 0) === tgt
+  );
+
+  //   c) båda diagonalerna
+  const diag1 = M.reduce((sum, row, r) => sum + row[r], 0) === tgt;
+  const diag2 = M.reduce((sum, row, r) => sum + row[sz - 1 - r], 0) === tgt;
+
+  // 4. Slutgiltig bedömning
+  ok = rowsOk && colsOk && diag1 && diag2;
+  break;
+}
 
     msgEl  = document.createElement('div'); msgEl.className='error-msg';
     hintEl = document.createElement('div'); hintEl.className='hint-msg';
